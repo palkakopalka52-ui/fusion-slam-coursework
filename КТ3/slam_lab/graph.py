@@ -23,6 +23,25 @@ def compose(a, step):
     return np.r_[a[:2] + rotate(step[:2], a[2]), wrap(a[2] + step[2])]
 
 
+def camera_delta_to_base(T21, T_BC):
+    """Project a PnP transform Cj <- Ci to a planar motion Bi <- Bj (x, y, yaw)."""
+    def rigid(value):
+        M = np.asarray(value, dtype=float)
+        if (M.shape != (4, 4) or not np.isfinite(M).all()
+                or not np.allclose(M[3], [0, 0, 0, 1], atol=1e-7, rtol=0)):
+            raise ValueError('expected a finite homogeneous transform')
+        R = M[:3, :3]
+        if not np.allclose(R.T @ R, np.eye(3), atol=1e-6) or np.linalg.det(R) <= 0:
+            raise ValueError('expected a proper rotation')
+        return M
+
+    camera, mounting = rigid(T21), rigid(T_BC)
+    step = mounting @ np.linalg.inv(camera) @ np.linalg.inv(mounting)
+    if np.hypot(step[0, 0], step[1, 0]) < 1e-8:
+        raise ValueError('body heading has no horizontal projection')
+    return np.array([step[0, 3], step[1, 3], np.arctan2(step[1, 0], step[0, 0])])
+
+
 @dataclass(frozen=True)
 class Factor:
     kind: str
@@ -41,6 +60,7 @@ class Graph:
 
 
 SIZES = {'wheel': 3, 'vo': 3, 'loop': 3, 'gyro': 1, 'beacon': 2}
+COURSE_HUBER = ('vo', 'loop', 'beacon')
 
 
 def validate(graph):
@@ -75,12 +95,17 @@ def wheel_path(graph):
 
 class Problem:
     """Compile the measurement graph once. No reference poses or landmark map are accepted."""
-    def __init__(self, graph):
+    def __init__(self, graph, robust_kinds=None):
         validate(graph)
+        robust_kinds = set(SIZES if robust_kinds is None else robust_kinds)
+        if robust_kinds.difference(SIZES):
+            raise ValueError('unknown robust factor kind')
         self.graph = graph
+        self.loss_evaluations = 0
         self.dim = 3*(graph.poses-1) + 2*graph.landmarks + 1
         self.groups = []
         self.blocks = []
+        robust_blocks = []
         start = 0
         for kind, width in SIZES.items():
             items = [f for f in graph.factors if f.kind == kind]
@@ -92,9 +117,11 @@ class Problem:
                                 np.array([f.z for f in items]), np.array([f.sigma for f in items]),
                                 np.array([f.dt for f in items])))
             self.blocks.extend([width] * len(items))
+            robust_blocks.extend([kind in robust_kinds] * len(items))
             start = end
         self.rows = start
         self.starts = np.cumsum([0]+self.blocks[:-1])
+        self.robust_blocks = np.asarray(robust_blocks, dtype=bool)
 
     def initial(self):
         poses = wheel_path(self.graph)
@@ -154,13 +181,16 @@ class Problem:
     def loss(self, r, delta):
         # Huber is applied to the norm of a whole normalized sensor block.
         squared = np.add.reduceat(r*r, self.starts)
+        self.loss_evaluations += 1
         if delta is None:
             return .5 * squared.sum(), np.ones_like(squared)
         if not np.isfinite(delta) or delta <= 0:
             raise ValueError('Huber threshold must be positive')
         lengths = np.sqrt(squared)
-        weights = np.minimum(1., delta/np.maximum(lengths, 1e-30))
-        cost = np.where(lengths <= delta, .5*squared, delta*(lengths-.5*delta))
+        tails = self.robust_blocks & (lengths > delta)
+        weights = np.ones_like(lengths)
+        weights[tails] = delta / lengths[tails]
+        cost = np.where(tails, delta*(lengths-.5*delta), .5*squared)
         return cost.sum(), weights
 
     def objective(self, x, delta):

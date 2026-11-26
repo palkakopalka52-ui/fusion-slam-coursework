@@ -2,36 +2,50 @@
 from dataclasses import asdict, replace
 from pathlib import Path
 import json
+import platform
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import scipy
 from scipy.optimize import least_squares
 from threadpoolctl import threadpool_limits
 
-from slam_lab import Problem, solve, wheel_path
+from slam_lab import COURSE_HUBER, Problem, solve, wheel_path
 from slam_lab.bench import episode, score
 
 SEEDS = [23,24,25,26,71,72,73,74]
 CONDITIONS = ['clean','outliers','dropout','false_loop']
 
 
+def interval_counts(graph, seed, scenario):
+    rows = [dict(seed=seed, scenario=scenario, interval=i, wheel=0, vo=0, gyro=0, beacon=0)
+            for i in range(graph.poses-1)]
+    for f in graph.factors:
+        if f.kind != 'loop' and f.i < len(rows):
+            rows[f.i][f.kind] += 1
+    return rows
+
+
 def run(folder='results'):
     folder = Path(folder)
     folder.mkdir(exist_ok=True, parents=True)
     records = []
+    availability = []
     example = None
     with threadpool_limits(limits=1):
         for condition in CONDITIONS:
             for seed in SEEDS:
                 graph, truth = episode(seed,condition)
+                availability.extend(interval_counts(graph,seed,condition))
                 wheel = wheel_path(graph)
                 coverage = sum(f.kind == 'vo' for f in graph.factors)/(graph.poses-1)
                 records.append(dict(seed=seed, scenario=condition, method='wheel', vo_coverage=coverage,
                                     **score(wheel,truth)))
-                for method, delta, omit in [('WLS',None,False),('Huber',2.5,False),('Huber без петли',2.5,True)]:
+                for method, delta, omit, kinds in [('WLS',None,False,None),('Huber',2.5,False,None),
+                        ('Huber без петли',2.5,True,None),('Huber Colab',2.5,False,COURSE_HUBER)]:
                     active = replace(graph,factors=tuple(f for f in graph.factors if f.kind != 'loop')) if omit else graph
-                    sol = solve(active,delta=delta)
+                    sol = solve(active,delta=delta,robust_kinds=kinds)
                     records.append(dict(seed=seed,scenario=condition,method=method,vo_coverage=coverage,
                                         **score(sol.poses,truth,sol.landmarks), bias_rad_s=sol.bias,
                                         bias_error_rad_s=sol.bias-truth.bias, final_cost=sol.history[-1],
@@ -52,10 +66,32 @@ def run(folder='results'):
     df = pd.DataFrame(records)
     df.to_csv(folder/'runs.csv',index=False)
     agg = df.groupby(['scenario','method']).agg(ate_median=('ate_m','median'),ate_min=('ate_m','min'),
-              ate_max=('ate_m','max'),rpe_median=('rpe_m','median'),map_median=('map_m','median')).reset_index()
+              ate_max=('ate_m','max'),rpe_median=('rpe_m','median'),map_median=('map_m','median'),
+              yaw_median_rad=('yaw_rad','median')).reset_index()
     agg.to_csv(folder/'summary.csv',index=False)
     (folder/'measurements.json').write_text(json.dumps(asdict(graph),indent=2))
     np.savez(folder/'reference.npz',poses=truth.poses,landmarks=truth.landmarks,bias=truth.bias)
+    np.savetxt(folder/'trajectory.csv', sol.poses, delimiter=',', header='x_m,y_m,yaw_rad', comments='')
+    np.savetxt(folder/'landmarks.csv', sol.landmarks, delimiter=',', header='x_m,y_m', comments='')
+    counts = pd.DataFrame(availability)
+    counts.to_csv(folder/'factor_availability.csv',index=False)
+    focus = counts[(counts.seed==23) & (counts.scenario=='dropout')]
+    sensors = ['wheel','vo','gyro','beacon']
+    heat, hax = plt.subplots(figsize=(8,2.4),layout='constrained')
+    hax.imshow(focus[sensors].to_numpy().T > 0,aspect='auto',interpolation='nearest',
+               cmap='Blues',vmin=0,vmax=1)
+    hax.set(yticks=range(4),yticklabels=['Колёса','VO','Гироскоп','Ориентиры'],
+            xticks=range(0,graph.poses-1,2),xlabel='Начальная поза интервала i → i+1',
+            title='Доступность измерений · разрыв VO · seed 23')
+    heat.savefig(folder/'availability.png',dpi=150)
+    plt.close(heat)
+    manifest = dict(seeds=SEEDS,scenarios=CONDITIONS,poses=graph.poses,interval_s=1.0,
+                    example={'seed':23,'scenario':'false_loop','estimate':'Huber'},
+                    methods=df.method.unique().tolist(), course_huber_kinds=COURSE_HUBER,
+                    huber_delta=2.5,initial_lambda=.003,iterations=24,budget=48,
+                    python=platform.python_version(),numpy=np.__version__,scipy=scipy.__version__,
+                    pandas=pd.__version__,matplotlib=plt.matplotlib.__version__)
+    (folder/'run_manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2))
     fig,ax = plt.subplots(1,2,figsize=(10,4.1),layout='constrained')
     for path,name,color in [(truth.poses,'Эталон','#222222'),(wheel_path(graph),'Колёса','#bd6c30'),
                              (ours.poses,'WLS','#73879a'),(sol.poses,'Huber','#007c83')]:
@@ -75,4 +111,4 @@ def run(folder='results'):
 
 
 if __name__ == '__main__':
-    print(run().to_string(index=False))
+    run()
