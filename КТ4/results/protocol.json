@@ -1,0 +1,94 @@
+{
+  "train": [
+    310,
+    311,
+    312,
+    313,
+    314,
+    315,
+    316,
+    317,
+    318,
+    319,
+    320,
+    321,
+    322,
+    323,
+    324,
+    325,
+    326,
+    327,
+    328,
+    329
+  ],
+  "validation": [
+    710,
+    711,
+    712,
+    713,
+    714,
+    715
+  ],
+  "test": [
+    1810,
+    1811,
+    1812,
+    1813,
+    1814,
+    1815,
+    1816,
+    1817
+  ],
+  "training_steps": 130,
+  "validation_steps": 36,
+  "teacher_grid": [
+    1e-05,
+    7.196856730011514e-05,
+    0.0005179474679231213,
+    0.003727593720314938,
+    0.026826957952797246,
+    0.19306977288832497,
+    1.389495494373136,
+    10.0
+  ],
+  "width_grid": [
+    8,
+    12,
+    16
+  ],
+  "learning_rate_grid": [
+    0.006,
+    0.014,
+    0.025
+  ],
+  "selection_metric": "minimum validation log-damping MSE",
+  "selected": {
+    "mlp": {
+      "model": "mlp",
+      "width": 12,
+      "lr": 0.014,
+      "best_epoch": 9,
+      "train_mse": 0.18924428758775624,
+      "validation_mse": 0.18466905738664915,
+      "max_abs_u": 0.0,
+      "selected": true
+    },
+    "rnn": {
+      "model": "rnn",
+      "width": 12,
+      "lr": 0.006,
+      "best_epoch": 19,
+      "train_mse": 0.1489430046547641,
+      "validation_mse": 0.20239680852196767,
+      "max_abs_u": 0.32726978858093775,
+      "selected": true
+    }
+  },
+  "cap": 0.8,
+  "epochs": 65,
+  "budget": 24,
+  "initial_lambda": 0.0003,
+  "model_seed": 19,
+  "numpy": "2.2.6",
+  "python": "3.12.16"
+}
