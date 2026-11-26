@@ -72,4 +72,4 @@ def run(folder='results'):
 
 
 if __name__ == '__main__':
-    print(run().round(4).to_string())
+    run()
