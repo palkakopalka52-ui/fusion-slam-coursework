@@ -56,11 +56,17 @@ class DampingAdvisor:
         a=np.tanh(h[1:]@self.params['v']+self.params['c'][0])
         return x,h,a
 
-    def propose(self,features):
-        x=(features-self.center)/self.scale
-        self.hidden=self.advance(x,self.hidden)
-        out=np.tanh(self.hidden@self.params['v']+self.params['c'][0])
-        return float(10**(-2.+3.*out))
+    def propose(self, features):
+        features = np.asarray(features, dtype=float)
+        if features.shape != (len(FEATURES),) or not np.isfinite(features).all():
+            raise ValueError('expected six finite solver diagnostics')
+        normalized = (features - self.center) / self.scale
+        hidden = self.advance(normalized, self.hidden)
+        output = np.tanh(hidden @ self.params['v'] + self.params['c'][0])
+        if not np.isfinite(output) or not np.isfinite(hidden).all():
+            raise ValueError('non-finite advisor state')
+        self.hidden = hidden
+        return float(10 ** (-2. + 3. * output))
 
     def loss(self,sequences):
         err=[(-2+3*self.forward(X)[2]-y)**2 for X,y in sequences]

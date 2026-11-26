@@ -7,6 +7,21 @@ from slam_lab import Problem
 
 
 class AdvisorChecks(unittest.TestCase):
+    def test_bad_features_preserve_memory(self):
+        good = np.linspace(-1., 1., 6)
+        invalid = [1., [1.], good[None, :], [np.nan, *good[1:]], [np.inf, *good[1:]]]
+        for recurrent in (False, True):
+            advisor = DampingAdvisor(recurrent=recurrent)
+            reference = DampingAdvisor(recurrent=recurrent)
+            advisor.propose(good)
+            reference.propose(good)
+            for features in invalid:
+                with self.subTest(recurrent=recurrent, features=features):
+                    with self.assertRaises(ValueError):
+                        advisor.propose(features)
+                    np.testing.assert_array_equal(advisor.hidden, reference.hidden)
+            self.assertEqual(advisor.propose(good), reference.propose(good))
+
     def test_feature_input_and_reset(self):
         class Probe:
             def reset(self):
