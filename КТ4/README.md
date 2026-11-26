@@ -30,10 +30,10 @@ from slam_lab.bench import episode
 graph, reference = episode(1810, "dropout")
 policy = DampingAdvisor.load("results/rnn.npz")
 estimate = solve(graph, policy=policy, initial_lambda=0.0003, budget=24)
-print(estimate.solves, estimate.status, estimate.history[-1])
+trajectory = estimate.poses
 ```
 
-Порядок шести входов, средние и масштабы нормировки, ограничение памяти и параметры сети записаны в NPZ. Загрузчик проверяет размерности и имена признаков. В `results/protocol.json` сохранены разбиение, сетка учителя и параметры обучения. Локальные проверки проводились на CPU в Python 3.12.
+Порядок шести входов, средние и масштабы нормировки, ограничение памяти и параметры сети записаны в NPZ. Загрузчик проверяет размерности и имена признаков. В `results/protocol.json` сохранены разбиение, сетка учителя и параметры обучения. В Google Colab на CPU прошли шесть тестов, 200 основных и 72 стрессовых запуска. [Данные облачного прогона](results/colab_cpu.json)
 
 Дополнительный опыт можно выполнить сразу с готовыми весами. [План](experiment_plan.md), [72 запуска](results/stress_runs.csv) и [медианы и диапазоны](results/stress_summary.csv) позволяют проверить прогноз. В таблице `advisor_calls` считает обращения к сети, `solves` — попытки линейного решения, `loss_evaluations` — все фактические вычисления скалярной потери при инициализации, линеаризации и проверке кандидата.
 

@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 from threadpoolctl import threadpool_limits
 
-# Local checkout with the companion KT3 library, or the installed gallery-fusion-slam package.
 sibling=Path(__file__).resolve().parents[1]/'КТ3'
 if sibling.is_dir():
     sys.path.insert(0,str(sibling))
@@ -118,4 +117,4 @@ def run(folder='results'):
 
 
 if __name__=='__main__':
-    print(run().round(4).to_string())
+    run()
