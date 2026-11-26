@@ -1,0 +1,7 @@
+{
+  "seed": 23,
+  "scenario": "false_loop",
+  "own_WLS": 1774.2332045499356,
+  "scipy_WLS": 1774.2332042078378,
+  "max_state_diff": 3.106839220175239e-05
+}
