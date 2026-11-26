@@ -19,6 +19,8 @@ class AdvisorChecks(unittest.TestCase):
         probe=Probe()
         first=solve(graph,policy=probe)
         n=len(probe.seen)
+        self.assertEqual(first.advisor_calls,n)
+        self.assertGreaterEqual(first.loss_evaluations,1 + first.solves + n)
         again=solve(graph,policy=probe)
         self.assertEqual(len(probe.seen),n)
         np.testing.assert_array_equal(first.x,again.x)
@@ -49,10 +51,16 @@ class AdvisorChecks(unittest.TestCase):
         x=pb.initial()+np.random.default_rng(2).normal(0,3,pb.dim)
         refused=solve(g,policy='fixed',initial_lambda=1e-7,x0=x,budget=1)
         self.assertEqual((refused.status,refused.rejects,refused.solves),('budget',1,1))
+        self.assertEqual((refused.advisor_calls,refused.loss_evaluations),(0,3))
         np.testing.assert_array_equal(refused.x,x)
 
     def test_route_split(self):
         self.assertFalse(set(TRAIN)&set(VALID) or set(TRAIN)&set(TEST) or set(VALID)&set(TEST))
+
+    def test_robust_gradient_and_descent(self):
+        from stress_test import gradient_check
+        certificate=gradient_check(episode(3540,'false_loop')[0],.003)
+        self.assertLess(certificate['relative_inf_error'],1e-6)
 
 
 if __name__=='__main__':
