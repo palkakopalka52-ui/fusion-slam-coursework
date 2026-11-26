@@ -14,7 +14,8 @@ root=Path(__file__).resolve().parent
 config=json.loads((root/'config.json').read_text())
 net=keras.models.load_model(root/'predictor.keras',compile=False)
 boost=joblib.load(root/'boost.joblib')
-G=pose_matrix([1.,2.,.3]); np.testing.assert_allclose(inverse(G)@G,np.eye(3),atol=1e-12)
+G=pose_matrix([1.,2.,.3])
+np.testing.assert_allclose(inverse(G)@G,np.eye(3),atol=1e-12)
 A=np.array([[1.,0.],[-1.,1.],[0.,1.]]);z=np.array([1.,1.,2.1]);H,b,B,d=normal_system(A,z,np.ones(3))
 np.testing.assert_allclose(fixed_point(H,b)['x'],np.linalg.lstsq(B,d,rcond=None)[0],atol=1e-7)
 assert fa.calibrate_scale([1.,2.],[-1.,-2.])['a']==0
@@ -32,6 +33,6 @@ for reg in ['nominal','shift']:
             np.testing.assert_array_equal(revised.z, original.z)
         uncalibrated = fa.estimate_slam(raw, pred, sigma=config['sigma_raw'])
         np.testing.assert_array_equal(uncalibrated['x'], baseline['x'])
-    if a==0: np.testing.assert_allclose(sol['x'],baseline['x'],atol=1e-12)
-    print(reg, 'ATE [m]', round(fa.evaluate(sol,ref)['ate_rmse_m'],4), 'status',sol['status'])
-print('PASS: export loaded, geometry, linear solver, gate, new episode')
+    assert np.isfinite(fa.evaluate(sol, ref)['ate_rmse_m'])
+    if a == 0:
+        np.testing.assert_allclose(sol['x'], baseline['x'], atol=1e-12)

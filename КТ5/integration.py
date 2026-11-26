@@ -55,7 +55,6 @@ def run():
                     np.testing.assert_array_equal(fits['raw'].x,fits['gate'].x)
     with (ROOT/'integration.csv').open('w',newline='') as f:
         writer=csv.DictWriter(f,fieldnames=rows[0]);writer.writeheader();writer.writerows(rows)
-    print('Проверено сочетаний:',len(rows))
 
 
 if __name__=='__main__':
