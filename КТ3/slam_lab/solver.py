@@ -54,17 +54,19 @@ class Estimate:
     rejects: int
     status: str
     seconds: float
+    advisor_calls: int = 0
+    loss_evaluations: int = 0
 
 
 def solve(graph, *, delta=2.5, policy='classical', initial_lambda=.003, iterations=24,
-          budget=48, x0=None):
+          budget=48, x0=None, robust_kinds=None):
     """policy is 'classical', 'fixed', or an object implementing reset() and propose(features)."""
     if not MIN_LAMBDA <= initial_lambda <= MAX_LAMBDA or budget < 1 or iterations < 1:
         raise ValueError('invalid damping or solve budget')
     if isinstance(policy,str) and policy not in ('classical','fixed'):
         raise ValueError('unknown damping policy')
     started = time.perf_counter()
-    pb = Problem(graph)
+    pb = Problem(graph, robust_kinds)
     x = pb.initial() if x0 is None else np.asarray(x0,dtype=float).copy()
     if x.shape != (pb.dim,) or not np.isfinite(x).all():
         raise ValueError('invalid initial state')
@@ -73,7 +75,7 @@ def solve(graph, *, delta=2.5, policy='classical', initial_lambda=.003, iteratio
     previous = current = float(initial_lambda)
     rho = 1.
     history = [float(pb.objective(x, delta))]
-    solves = rejects = 0
+    solves = rejects = advisor_calls = 0
     status = 'iteration_limit'
     for _ in range(iterations):
         state = linear_step(pb, x, delta, previous, rho)
@@ -83,6 +85,7 @@ def solve(graph, *, delta=2.5, policy='classical', initial_lambda=.003, iteratio
         if isinstance(policy,str):
             damping = initial_lambda if policy == 'fixed' else current
         else:
+            advisor_calls += 1
             proposal = float(policy.propose(state.features.copy()))
             damping = np.clip(proposal, MIN_LAMBDA, MAX_LAMBDA) if np.isfinite(proposal) and proposal > 0 else current
         accepted = False
@@ -111,4 +114,5 @@ def solve(graph, *, delta=2.5, policy='classical', initial_lambda=.003, iteratio
             status = 'budget'
             break
     poses, marks, bias = pb.unpack(x)
-    return Estimate(x,poses,marks,float(bias),history,solves,rejects,status,time.perf_counter()-started)
+    return Estimate(x,poses,marks,float(bias),history,solves,rejects,status,time.perf_counter()-started,
+                    advisor_calls,pb.loss_evaluations)

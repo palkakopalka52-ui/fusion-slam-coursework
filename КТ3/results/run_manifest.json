@@ -1,0 +1,46 @@
+{
+  "seeds": [
+    23,
+    24,
+    25,
+    26,
+    71,
+    72,
+    73,
+    74
+  ],
+  "scenarios": [
+    "clean",
+    "outliers",
+    "dropout",
+    "false_loop"
+  ],
+  "poses": 21,
+  "interval_s": 1.0,
+  "example": {
+    "seed": 23,
+    "scenario": "false_loop",
+    "estimate": "Huber"
+  },
+  "methods": [
+    "wheel",
+    "WLS",
+    "Huber",
+    "Huber без петли",
+    "Huber Colab"
+  ],
+  "course_huber_kinds": [
+    "vo",
+    "loop",
+    "beacon"
+  ],
+  "huber_delta": 2.5,
+  "initial_lambda": 0.003,
+  "iterations": 24,
+  "budget": 48,
+  "python": "3.12.16",
+  "numpy": "2.2.6",
+  "scipy": "1.18.1",
+  "pandas": "3.1.1",
+  "matplotlib": "3.11.2"
+}

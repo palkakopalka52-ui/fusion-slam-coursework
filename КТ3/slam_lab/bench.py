@@ -57,4 +57,5 @@ def score(poses, truth, landmarks=None):
     def rmse(vec):
         return float(np.sqrt(np.mean(np.sum(vec**2,axis=1))))
     return {'ate_m':rmse(xy_error), 'rpe_m':rmse(est-ref),
+            'yaw_rad':float(np.sqrt(np.mean(wrap(poses[:,2]-truth.poses[:,2])**2))),
             'map_m':rmse(landmarks-truth.landmarks) if landmarks is not None else float('nan')}

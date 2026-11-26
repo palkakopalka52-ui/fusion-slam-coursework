@@ -1,7 +1,7 @@
 import unittest
 from dataclasses import replace
 import numpy as np
-from slam_lab import Problem, compose, relative, solve, validate, wrap
+from slam_lab import COURSE_HUBER, Problem, camera_delta_to_base, compose, relative, solve, validate, wrap
 from slam_lab.bench import episode
 
 
@@ -22,6 +22,27 @@ class GraphChecks(unittest.TestCase):
         numeric = np.stack([(p.linearize(x+h*d,False)[0]-p.linearize(x-h*d,False)[0])/(2*h)
                             for d in np.eye(len(x))],axis=1)
         np.testing.assert_allclose(analytic,numeric,atol=2e-6,rtol=2e-6)
+
+    def test_pnp_in_optical_axes(self):
+        # Optical Z points forward, X right, Y down. A lever arm also moves during yaw.
+        mounting = np.array([[0,0,1,.21],[-1,0,0,.03],[0,-1,0,.14],[0,0,0,1.]])
+        a = .4
+        body = np.array([[np.cos(a),-np.sin(a),0,.35],[np.sin(a),np.cos(a),0,-.08],
+                         [0,0,1,0],[0,0,0,1]])
+        T21 = np.linalg.inv(mounting) @ np.linalg.inv(body) @ mounting
+        np.testing.assert_allclose(camera_delta_to_base(T21,mounting),[.35,-.08,a],atol=1e-12)
+        with self.assertRaises(ValueError):
+            camera_delta_to_base(T21, np.diag([-1,1,1,1]))
+
+    def test_whitening_and_course_scope(self):
+        from slam_lab import Factor, Graph
+        factors = (Factor('wheel',0,1,(0,0,0),(.5,1,1)),Factor('vo',0,1,(0,0,0),(.5,1,1)))
+        pb = Problem(Graph(2,0,factors), COURSE_HUBER)
+        r,_ = pb.linearize(np.array([2.,0,0,0]))
+        np.testing.assert_allclose(r,[4,0,0,4,0,0])
+        cost,weights = pb.loss(r,2.)
+        np.testing.assert_allclose(weights,[1,.5])
+        self.assertAlmostEqual(cost,14.)
 
     def test_bad_measurements(self):
         f = self.graph.factors[0]
