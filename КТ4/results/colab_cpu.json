@@ -1,0 +1,9 @@
+{
+  "platform": "Google Colab",
+  "backend": "CPU",
+  "python": "3.13.18",
+  "runs": 200,
+  "stress_runs": 72,
+  "tests": 6,
+  "sha256": "deed60eee2d9a3f169709ce02455d2da20124a4dc68389cf72becbafe79b8b41"
+}
